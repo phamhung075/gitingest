@@ -172,3 +172,4 @@ Caddyfile
 
 # ignore default output directory
 tmp/*
+digest.txt
