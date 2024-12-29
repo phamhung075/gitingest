@@ -19,13 +19,27 @@ def should_include(path: str, base_path: str, include_patterns: List[str]) -> bo
     return include
 
 def should_exclude(path: str, base_path: str, ignore_patterns: List[str]) -> bool:
-    rel_path = path.replace(base_path, "").lstrip(os.sep)
+    """
+    Check if a file or directory should be ignored.
+
+    Args:
+        path (str): Path to check.
+        base_path (str): Root base path.
+        ignore_patterns (List[str]): List of patterns to ignore.
+
+    Returns:
+        bool: True if the path should be ignored.
+    """
+    rel_path = os.path.relpath(path, base_path).replace("\\", "/")
     for pattern in ignore_patterns:
-        if pattern == '':
-            continue
-        if fnmatch(rel_path, pattern):
+        if fnmatch(rel_path, pattern) or fnmatch(os.path.basename(path), pattern):
+            return True
+        # Special case for directories ending with /
+        if os.path.isdir(path) and fnmatch(rel_path + '/', pattern):
             return True
     return False
+
+
 
 def is_safe_symlink(symlink_path: str, base_path: str) -> bool:
     """Check if a symlink points to a location within the base directory."""
@@ -96,8 +110,10 @@ def scan_directory(path: str, query: dict, seen_paths: set = None, depth: int = 
     try:
         for item in os.listdir(path):
             item_path = os.path.join(path, item)
+            print(f"Checking path: {path}")
 
             if should_exclude(item_path, base_path, ignore_patterns):
+                print(f"Checking path: {path}")
                 continue
 
             is_file = os.path.isfile(item_path)
