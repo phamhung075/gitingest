@@ -4,10 +4,11 @@ import shutil
 from pathlib import Path
 import io
 import sys
+from typing import Union
 
 # Import other modules from the package
 from gitingest.parse_query import parse_query
-from gitingest.clone import clone_repo
+from gitingest.clone import clone_repo, CloneConfig
 from gitingest.ingest_from_query import ingest_from_query
 
 def setup_encoding():
@@ -17,8 +18,8 @@ def setup_encoding():
         sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
 
 def ingest(source: str, max_file_size: int = 10 * 1024 * 1024, 
-          include_patterns: Union[List[str], str] = None, 
-          exclude_patterns: Union[List[str], str] = None, 
+          include_patterns: Union[list[str], str] = None, 
+          exclude_patterns: Union[list[str], str] = None, 
           output: str = None) -> tuple[str, str, str]:
     """
     Analyze and create a text dump of source contents.
