@@ -2,13 +2,14 @@ import os
 import pathlib
 import click
 import sys
+
+from gitingest.ingest_from_query import MAX_FILE_SIZE
 from .encoding import setup_encoding
 
 # Setup encoding first
 setup_encoding()
 
 # Define constants
-MAX_FILE_SIZE = 51200  # 50KB by default
 DEFAULT_IGNORE_PATTERNS = []
 
 def normalize_pattern(pattern: str) -> str:
