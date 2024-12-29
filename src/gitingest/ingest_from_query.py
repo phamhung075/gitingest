@@ -165,28 +165,7 @@ def scan_directory(
             if is_file and query["include_patterns"]:
                 if not should_include(item_path, base_path, include_patterns):
                     result["ignore_content"] = True
-                    continue
-
-                    stats["total_files"] += 1
-                    stats["total_size"] += file_size
-
-                    if stats["total_files"] > MAX_FILES:
-                        print(f"Maximum file limit ({MAX_FILES}) reached")
-                        return result
-
-                    is_text = is_text_file(real_path)
-                    content = read_file_content(real_path) if is_text else "[Non-text file]"
-
-                    child = {
-                        "name": item,
-                        "type": "file",
-                        "size": file_size,
-                        "content": content,
-                        "path": item_path,
-                    }
-                    result["children"].append(child)
-                    result["size"] += file_size
-                    result["file_count"] += 1
+                    continue                    
 
                 elif os.path.isdir(real_path):
                     subdir = scan_directory(
