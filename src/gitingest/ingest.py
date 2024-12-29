@@ -1,6 +1,6 @@
 import asyncio
+import inspect
 import shutil
-from typing import Union, List
 from pathlib import Path
 import io
 import sys
@@ -37,10 +37,29 @@ def ingest(source: str, max_file_size: int = 10 * 1024 * 1024,
     query = None
     
     try:
-        query = parse_query(source, max_file_size, False, include_patterns, exclude_patterns)        
-        if query['url']:
-            asyncio.run(clone_repo(query))
-        
+        query = parse_query(
+            source=source,
+            max_file_size=max_file_size,
+            from_web=False,
+            include_patterns=include_patterns,
+            ignore_patterns=exclude_patterns,
+        )
+        if query["url"]:
+
+            # Extract relevant fields for CloneConfig
+            clone_config = CloneConfig(
+                url=query["url"],
+                local_path=query["local_path"],
+                commit=query.get("commit"),
+                branch=query.get("branch"),
+            )
+            clone_result = clone_repo(clone_config)
+
+            if inspect.iscoroutine(clone_result):
+                asyncio.run(clone_result)
+            else:
+                raise TypeError("clone_repo did not return a coroutine as expected.")
+
         summary, tree, content = ingest_from_query(query)
 
         if output:
