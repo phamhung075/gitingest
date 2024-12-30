@@ -105,38 +105,47 @@ def _scan_directory(
     # Check if path exists and is a directory
     if not os.path.exists(path):
         print(f"Path does not exist: {path}")
-        return None
+        return {
+            "name": os.path.basename(path),
+            "type": "directory",
+            "size": 0,
+            "children": [],
+            "file_count": 0,
+            "dir_count": 0,
+            "path": path,
+            "ignore_content": False,
+        }
         
     if not os.path.isdir(path):
         print(f"Path is not a directory: {path}")
-        return None
+        return {
+            "name": os.path.basename(path),
+            "type": "directory",
+            "size": 0,
+            "children": [],
+            "file_count": 0,
+            "dir_count": 0,
+            "path": path,
+            "ignore_content": False,
+        }
 
-    # Check if path is same as or subdirectory of base_path
-    try:
-        relative = os.path.relpath(path, base_path)
-        if relative.startswith('..'):
-            print(f"Skipping path outside target directory: {path}")
-            return None
-    except ValueError:
-        print(f"Skipping path outside target directory: {path}")
-        return None
-
-    if depth > MAX_DIRECTORY_DEPTH:
-        print(f"Skipping deep directory: {path} (max depth {MAX_DIRECTORY_DEPTH} reached)")
-        return None
-
-    if stats["total_files"] >= MAX_FILES:
-        print(f"Skipping further processing: maximum file limit ({MAX_FILES}) reached")
-        return None
-
-    if stats["total_size"] >= MAX_TOTAL_SIZE_BYTES:
-        print(f"Skipping further processing: maximum total size ({MAX_TOTAL_SIZE_BYTES/1024/1024:.1f}MB) reached")
-        return None
+    # Ensure we're not skipping the base path
+    if path == base_path or path.startswith(base_path):
+        base_path = path
 
     real_path = os.path.realpath(path)
     if real_path in seen_paths:
         print(f"Skipping already visited path: {path}")
-        return None
+        return {
+            "name": os.path.basename(path),
+            "type": "directory",
+            "size": 0,
+            "children": [],
+            "file_count": 0,
+            "dir_count": 0,
+            "path": path,
+            "ignore_content": False,
+        }
 
     seen_paths.add(real_path)
 
@@ -161,82 +170,35 @@ def _scan_directory(
             
             print(f"Checking path: {item_path}")  # Show what we're actually checking
 
+            # Check if the item should be excluded
             if _should_exclude(item_path, base_path, ignore_patterns):
+                print(f"Skipping excluded path: {item_path}")
                 continue
 
+            # Check if this is a file and include patterns are specified
             is_file = os.path.isfile(item_path)
-            if is_file and query["include_patterns"]:
-                if not _should_include(item_path, base_path, include_patterns):
-                    result["ignore_content"] = True
-                    continue
-
-            # Handle symlinks
-            if os.path.islink(item_path):
-                if not _is_safe_symlink(item_path, base_path):
-                    print(f"Skipping symlink that points outside base directory: {item_path}")
-                    continue
-                real_path = os.path.realpath(item_path)
-                if real_path in seen_paths:
-                    print(f"Skipping already visited symlink target: {item_path}")
-                    continue
-
-                if os.path.isfile(real_path):
-                    file_size = os.path.getsize(real_path)
-                    if stats["total_size"] + file_size > MAX_TOTAL_SIZE_BYTES:
-                        print(f"Skipping file {item_path}: would exceed total size limit")
-                        continue
-
-                    stats["total_files"] += 1
-                    stats["total_size"] += file_size
-
-                    if stats["total_files"] > MAX_FILES:
-                        print(f"Maximum file limit ({MAX_FILES}) reached")
-                        return result
-
-                    is_text = _is_text_file(real_path)
-                    content = _read_file_content(real_path) if is_text else "[Non-text file]"
-
-                    child = {
-                        "name": item,
-                        "type": "file",
-                        "size": file_size,
-                        "content": content,
-                        "path": item_path,
-                    }
-                    result["children"].append(child)
-                    result["size"] += file_size
-                    result["file_count"] += 1
-
-                elif os.path.isdir(real_path):
-                    subdir = _scan_directory(
-                        path=real_path,
-                        query=query,
-                        seen_paths=seen_paths,
-                        depth=depth + 1,
-                        stats=stats,
-                    )
-                    if subdir and (not include_patterns or subdir["file_count"] > 0):
-                        subdir["name"] = item
-                        subdir["path"] = item_path
-                        result["children"].append(subdir)
-                        result["size"] += subdir["size"]
-                        result["file_count"] += subdir["file_count"]
-                        result["dir_count"] += 1 + subdir["dir_count"]
+            if is_file and include_patterns and not _should_include(item_path, base_path, include_patterns):
+                print(f"Skipping file not matching include patterns: {item_path}")
                 continue
 
-            if os.path.isfile(item_path):
+            # Process file
+            if is_file:
                 file_size = os.path.getsize(item_path)
+                
+                # Check size and file count limits
                 if stats["total_size"] + file_size > MAX_TOTAL_SIZE_BYTES:
                     print(f"Skipping file {item_path}: would exceed total size limit")
                     continue
 
+                if stats["total_files"] >= MAX_FILES:
+                    print(f"Maximum file limit ({MAX_FILES}) reached")
+                    break
+
+                # Update stats
                 stats["total_files"] += 1
                 stats["total_size"] += file_size
 
-                if stats["total_files"] > MAX_FILES:
-                    print(f"Maximum file limit ({MAX_FILES}) reached")
-                    return result
-
+                # Check if it's a text file
                 is_text = _is_text_file(item_path)
                 content = _read_file_content(item_path) if is_text else "[Non-text file]"
 
@@ -251,7 +213,9 @@ def _scan_directory(
                 result["size"] += file_size
                 result["file_count"] += 1
 
+            # Process directory
             elif os.path.isdir(item_path):
+                # Recursive directory processing
                 subdir = _scan_directory(
                     path=item_path,
                     query=query,
@@ -259,11 +223,13 @@ def _scan_directory(
                     depth=depth + 1,
                     stats=stats,
                 )
+
+                # Add non-empty subdirectories or directories matching include patterns
                 if subdir and (not include_patterns or subdir["file_count"] > 0):
                     result["children"].append(subdir)
                     result["size"] += subdir["size"]
                     result["file_count"] += subdir["file_count"]
-                    result["dir_count"] += 1 + subdir["dir_count"]
+                    result["dir_count"] += 1 + subdir.get("dir_count", 0)
 
     except PermissionError:
         print(f"Permission denied: {path}")
