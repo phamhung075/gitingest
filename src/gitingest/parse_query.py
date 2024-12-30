@@ -190,20 +190,6 @@ def extract_valid_url(source: str) -> Union[str, None]:
 
     return None
 
-def _parse_path(path: str) -> dict[str, Any]:
-    """Parse a local file path."""
-    # Normalize path separators and make absolute, remove trailing slashes
-    normalized_path = os.path.abspath(os.path.normpath(path.rstrip('\\/')))
-    
-    return {
-        "local_path": normalized_path,
-        "slug": os.path.basename(normalized_path),
-        "subpath": "/",
-        "id": str(uuid.uuid4()),
-        "url": None,
-    }
-
-import re
 
 def parse_query(
     source: str,
@@ -264,7 +250,7 @@ def parse_query(
 
     # Add user-defined ignore patterns
     if ignore_patterns:
-        parsed_ignore = parse_patterns(ignore_patterns)
+        parsed_ignore = _parse_patterns(ignore_patterns)
         final_ignore_patterns.extend(parsed_ignore)
 
 
@@ -282,11 +268,6 @@ def parse_query(
     })
 
     return query
-
-
-
-
-
 
 
 
