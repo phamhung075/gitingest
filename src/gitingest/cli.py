@@ -1,6 +1,5 @@
 import os
 import pathlib
-
 import click
 import sys
 
@@ -12,14 +11,6 @@ setup_encoding()
 
 # Define constants
 DEFAULT_IGNORE_PATTERNS = []
-
-def normalize_pattern(pattern: str) -> str:
-    pattern = pattern.strip()
-    pattern = pattern.lstrip(os.sep)
-    if pattern.endswith(os.sep):
-        pattern += "*"
-    return pattern
-
 
 @click.command()
 @click.argument("source", type=str, required=True)

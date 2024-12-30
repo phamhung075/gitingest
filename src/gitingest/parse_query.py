@@ -1,4 +1,5 @@
 import os
+import re
 import string
 import sys
 import uuid
@@ -7,16 +8,13 @@ from urllib.parse import urlparse, unquote
 
 from gitingest.ignore_patterns import DEFAULT_IGNORE_PATTERNS
 
-TMP_BASE_PATH = "../tmp"
+TMP_BASE_PATH: str = "../tmp"
 HEX_DIGITS = set(string.hexdigits)
 
 
-from urllib.parse import urlparse, unquote
-
-def parse_url(url: str) -> dict[str, Any]:
-    """Parse and validate a Git repository URL."""
-    # Clean and decode URL
-    url = unquote(url).strip()
+def _parse_url(url: str) -> dict[str, Any]:
+    url = url.split(" ")[0]
+    url = unquote(url)  # Decode URL-encoded characters
 
     if not url.startswith("https://") and not url.startswith("http://"):
         url = "https://" + url
@@ -76,7 +74,7 @@ def _is_valid_git_commit_hash(commit: str) -> bool:
     return len(commit) == 40 and all(c in HEX_DIGITS for c in commit)
 
 
-def normalize_pattern(pattern: str) -> str:
+def _normalize_pattern(pattern: str) -> str:
     """
     Normalize a pattern by stripping and formatting.
 
@@ -93,21 +91,49 @@ def normalize_pattern(pattern: str) -> str:
     return pattern
 
 
-def parse_patterns(pattern: list[str] | str) -> list[str]:
-    patterns = pattern if isinstance(pattern, list) else [pattern]
-    patterns = [p.strip() for p in patterns]
+def _parse_patterns(pattern: list[str] | str) -> list[str]:
+    """
+    Parse and validate file/directory patterns for inclusion or exclusion.
 
+    Takes either a single pattern string or list of pattern strings and processes them into a normalized list.
+    Patterns are split on commas and spaces, validated for allowed characters, and normalized.
+
+    Parameters
+    ----------
+    pattern : list[str] | str
+        Pattern(s) to parse - either a single string or list of strings
+
+    Returns
+    -------
+    list[str]
+        List of normalized pattern strings
+
+    Raises
+    ------
+    ValueError
+        If any pattern contains invalid characters. Only alphanumeric characters,
+        dash (-), underscore (_), dot (.), forward slash (/), plus (+), and
+        asterisk (*) are allowed.
+    """
+    patterns = pattern if isinstance(pattern, list) else [pattern]
+
+    parsed_patterns = []
     for p in patterns:
+        parsed_patterns.extend(re.split(",| ", p))
+
+    parsed_patterns = [p for p in parsed_patterns if p != ""]
+
+    for p in parsed_patterns:
         if not all(c.isalnum() or c in "-_./+*" for c in p):
             raise ValueError(
                 f"Pattern '{p}' contains invalid characters. Only alphanumeric characters, dash (-), "
                 "underscore (_), dot (.), forward slash (/), plus (+), and asterisk (*) are allowed."
             )
 
-    return [normalize_pattern(p) for p in patterns]
+    return [_normalize_pattern(p) for p in parsed_patterns]
 
 
-def override_ignore_patterns(ignore_patterns: list[str], include_patterns: list[str]) -> list[str]:
+def _override_ignore_patterns(ignore_patterns: list[str], include_patterns: list[str]) -> list[str]:
     """
     Removes patterns from ignore_patterns that are present in include_patterns using set difference.
 
@@ -164,7 +190,7 @@ def extract_valid_url(source: str) -> Union[str, None]:
 
     return None
 
-def parse_path(path: str) -> dict:
+def _parse_path(path: str) -> dict[str, Any]:
     """Parse a local file path."""
     # Normalize path separators and make absolute, remove trailing slashes
     normalized_path = os.path.abspath(os.path.normpath(path.rstrip('\\/')))
@@ -241,11 +267,12 @@ def parse_query(
         parsed_ignore = parse_patterns(ignore_patterns)
         final_ignore_patterns.extend(parsed_ignore)
 
+
     # Handle include patterns
     parsed_include = None
     if include_patterns:
-        parsed_include = parse_patterns(include_patterns)
-        final_ignore_patterns = override_ignore_patterns(final_ignore_patterns, parsed_include)
+        parsed_include = _parse_patterns(include_patterns)
+        final_ignore_patterns = _override_ignore_patterns(final_ignore_patterns, parsed_include)
 
     # Update query
     query.update({
