@@ -228,11 +228,11 @@ def parse_query(
     # Step 2: Handle Web URLs
     if is_web:
         print(f"\n🌐 Processing web URL: {source}")
-        query = parse_url(source)
+        query = _parse_url(source)
         query.update({
             "max_file_size": max_file_size,
             "ignore_patterns": DEFAULT_IGNORE_PATTERNS.copy(),
-            "include_patterns": parse_patterns(include_patterns) if include_patterns else None
+            "include_patterns": _parse_patterns(include_patterns) if include_patterns else None
         })
         print(f"✅ Successfully parsed web URL: {query['url']}")
         return query
